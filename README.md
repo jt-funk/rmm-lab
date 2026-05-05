@@ -1,4 +1,4 @@
-# rmm-lab
+ # rmm-lab
 TacticalRMM deployment on a QEMU/KVM Debian VM on an Arch Linux host. Documents NAT networking, port forwarding, and local access without external exposure.
 
 ## VM Launch
@@ -20,7 +20,6 @@ deb-rmm() {
     -daemonize
 }
 
-alias debian-rmm="deb-rmm"
 ```
 
 QEMU user-mode NAT gives the VM outbound internet but the host cannot reach the VM directly. The `hostfwd` entries forward host ports to VM ports:
