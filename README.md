@@ -80,3 +80,85 @@ source env/bin/activate
 python manage.py shell -c "from accounts.models import User; print([u.username for u in User.objects.all()])"
 python manage.py changepassword <username>
 ```
+
+---
+ 
+## Deploying a Windows Agent — MOOKLAW-DC
+ 
+### Network Driver
+ 
+The Windows Server VM (MOOKLAW-DC) launched without a `-netdev` line in its QEMU command, so it had no network adapter at all. Adding virtio networking exposed a second problem: Windows Server Core has no virtio drivers built in and won't recognize the adapter without them.
+ 
+Fix: download the virtio driver ISO on the Arch host and attach it as a CD-ROM:
+ 
+```bash
+wget https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso
+```
+ 
+Add to the Windows VM launch command:
+ 
+```bash
+-netdev user,id=net0 \
+-device virtio-net-pci,netdev=net0 \
+-cdrom /path/to/virtio-win.iso \
+```
+ 
+Then install the network driver from inside the VM:
+ 
+```powershell
+pnputil /add-driver D:\NetKVM\2k25\amd64\netkvm.inf /install
+```
+ 
+Verify with:
+ 
+```powershell
+Get-NetAdapter
+Test-NetConnection -ComputerName 8.8.8.8 -Port 80
+```
+ 
+### Transferring the Agent Install Script
+ 
+TacticalRMM generates an 80-line PowerShell install script. I decided to serve the file over HTTP from the Arch host and pull it from the VM.
+ 
+On the Arch host:
+ 
+```bash
+cd /path/to/script
+python -m http.server 9999
+```
+ 
+From inside the Windows VM — the QEMU host is always reachable at `10.0.2.2`:
+ 
+```powershell
+Invoke-WebRequest -Uri "http://10.0.2.2:9999/agent-install.ps1" -OutFile "C:\agent-install.ps1"
+```
+ 
+### /etc/hosts on Windows
+ 
+The Windows VM needs a host entry for `10.0.2.2`, to resolve DNS requests for TacticalRMM domains:
+ 
+```powershell
+Add-Content -Path "C:\Windows\System32\drivers\etc\hosts" -Value "10.0.2.2 zip-host.duckdns.org rmm.zip-host.duckdns.org api.zip-host.duckdns.org mesh.zip-host.duckdns.org"
+```
+ 
+### Running the Agent Install
+ 
+```powershell
+Set-ExecutionPolicy Bypass -Scope Process
+.\agent-install.ps1
+```
+ 
+### MeshCentral Remote Control
+ 
+The mesh agent installs alongside TacticalRMM automatically. Remote control via MeshCentral works but requires enabling **Use Remote Keyboard Map** in the session settings — without it keystrokes don't register in Server Core. This is a known compatibility issue with headless Windows VMs.
+ 
+### Verifying Agent Functionality
+ 
+Once the agent appeared in TacticalRMM, a PowerShell script was created via Settings → Script Manager and run against MOOKLAW-DC to confirm end-to-end script execution:
+ 
+```powershell
+Get-ComputerInfo | Select-Object CsName, OsName, OsVersion, CsProcessors, CsTotalPhysicalMemory
+```
+ 
+Output returned successfully through TacticalRMM, confirming the full loop: agent connected, script pushed remotely, output retrieved.
+ 
