@@ -14,10 +14,10 @@ deb-rmm() {
     -M q35 \
     -smp 2 \
     -hda /hdd/vm-data/debian-rmm.qcow2 \
-    -netdev user,id=inet0,hostfwd=tcp:127.0.0.1:443-:443,hostfwd=tcp:127.0.0.1:80-:80,hostfwd=tcp:127.0.0.1:4222-:4222 \
+    -netdev user,id=inet0,hostfwd=tcp:127.0.0.1:443-:443,hostfwd=tcp:127.0.0.1:80-:80,hostfwd=tcp:127.0.0.1:4222-:4222, hostfwd=tcp:127.0.0.1:22-:2222 \
     -device virtio-net-pci,netdev=inet0 \
-    -vga virtio \
-    -display sdl
+    -display none \
+    -daemonize
 }
 
 alias debian-rmm="deb-rmm"
